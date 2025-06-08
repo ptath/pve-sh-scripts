@@ -1,18 +1,41 @@
 #!/bin/bash
 
-echo "Установка или обновление скриптов..."
-
 # Проверяем существование директории и создаем её, если нет
-if [ ! -d "/opt" ]; then
+if ! [ -d "/opt" ]; then
     sudo mkdir -p /opt
 fi
 
-# Скачиваем скрипт с отображением только ошибок
-echo "Скачивание скрипта..."
-wget -O /opt/smart_check.sh https://raw.githubusercontent.com/ptath/pve-sh-scripts/main/smart_check.sh 2>&1 >/dev/null
+# Функция для проверки и скачивания файла
+download_if_different() {
+    local local_file=$1
+    local remote_url=$2
+    local temp_file=$(mktemp)
+    
+    # Скачиваем удаленный файл во временный файл
+    wget -O "$temp_file" "$remote_url" 2>&1 >/dev/null
+    
+    # Проверяем, существует ли локальный файл
+    if [ -f "$local_file" ]; then
+        # Сравниваем файлы
+        if ! cmp -s "$local_file" "$temp_file"; then
+            echo "Локальный файл отличается от удаленного, производим обновление..."
+            sudo mv "$temp_file" "$local_file"
+            sudo chmod +x "$local_file"
+        else
+            echo "Файл не изменился, обновление не требуется."
+            rm "$temp_file"
+        fi
+    else
+        # Если локального файла нет - просто перемещаем скачанный
+        echo "Скачивание файла..."
+        sudo mv "$temp_file" "$local_file"
+        sudo chmod +x "$local_file"
+    fi
+}
 
-# Делаем скрипт исполняемым
-sudo chmod +x /opt/smart_check.sh
+# Скачиваем и проверяем smart_check.sh
+echo "Проверка и скачивание smart_check.sh..."
+download_if_different "/opt/smart_check.sh" "https://raw.githubusercontent.com/ptath/pve-sh-scripts/main/smart_check.sh"
 
 # Обрабатываем файл конфигурации
 if [ -f "/opt/.env" ]; then
